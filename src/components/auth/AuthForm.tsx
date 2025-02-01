@@ -23,29 +23,39 @@ export function AuthForm({ mode }: AuthFormProps) {
     setMounted(true)
   }, [])
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setLoading(true)
     setError(null)
 
+    const formData = new FormData(e.currentTarget)
+    const email = formData.get("email") as string
+    const password = formData.get("password") as string
+
     try {
       if (mode === "signup") {
-        const { error: signUpError } = await supabase.auth.signUp({
+        const { error } = await supabase.auth.signUp({
           email,
           password,
+          options: {
+            emailRedirectTo: `${window.location.origin}/auth/callback`
+          }
         })
-        if (signUpError) throw signUpError
-        router.push("/")
+        if (error) throw error
+
+        router.push("/login?from=signup")
       } else {
-        const { error: signInError } = await supabase.auth.signInWithPassword({
+        const { error } = await supabase.auth.signInWithPassword({
           email,
-          password,
+          password
         })
-        if (signInError) throw signInError
+        if (error) throw error
+
         router.push("/")
       }
     } catch (error) {
-      setError(error instanceof Error ? error.message : "エラーが発生しました")
+      console.error("Authentication error:", error)
+      setError(error instanceof Error ? error.message : "認証エラーが発生しました")
     } finally {
       setLoading(false)
     }
