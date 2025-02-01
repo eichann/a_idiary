@@ -9,6 +9,33 @@ import { Diary, moodEmojis } from "@/types/diary"
 import { AIComment } from "@/types/ai"
 import { use } from "react"
 
+// Markdownテキストを改行を保持してHTMLに変換する関数
+function formatComment(text: string): string {
+  return text
+    .split('\n')
+    .map(line => {
+      // 箇条書きの行
+      if (line.trim().startsWith('- ')) {
+        return `<li class="ml-4">${line.trim().substring(2)}</li>`
+      }
+      // 番号付きリストの行
+      if (/^\d+\.\s/.test(line.trim())) {
+        return `<li class="ml-4">${line.trim().substring(line.trim().indexOf(' ') + 1)}</li>`
+      }
+      // 見出しの行
+      if (line.trim().startsWith('【') && line.trim().endsWith('】')) {
+        return `<h4 class="font-bold mt-4 mb-2">${line.trim()}</h4>`
+      }
+      // 空行
+      if (line.trim() === '') {
+        return '<br />'
+      }
+      // 通常の行
+      return `<p>${line}</p>`
+    })
+    .join('\n')
+}
+
 export default function DiaryDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter()
   const unwrappedParams = use(params)
@@ -232,7 +259,12 @@ export default function DiaryDetailPage({ params }: { params: Promise<{ id: stri
                 </div>
               </CardHeader>
               <CardContent>
-                <p className="text-sm">{comment.comment}</p>
+                <div 
+                  className="text-sm prose prose-sm max-w-none"
+                  dangerouslySetInnerHTML={{ 
+                    __html: formatComment(comment.comment) 
+                  }}
+                />
               </CardContent>
             </Card>
           ))}
