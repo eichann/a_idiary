@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { AI_PERSONALITIES } from '@/lib/ai'
 
-export const maxDuration = 300 // 5分のタイムアウト
+export const maxDuration = 60 // 60秒
 
 // レスポンスをストリームとしてエンコードする関数
 function encodeStream(data: any) {
