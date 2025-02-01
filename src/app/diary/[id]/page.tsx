@@ -7,7 +7,6 @@ import { Card, CardContent, CardHeader, CardFooter } from "@/components/ui/card"
 import { supabase } from "@/lib/supabase/client"
 import { Diary, moodEmojis } from "@/types/diary"
 import { AIComment } from "@/types/ai"
-import { generateAIComments } from "@/lib/ai"
 import { use } from "react"
 
 export default function DiaryDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -70,36 +69,91 @@ export default function DiaryDetailPage({ params }: { params: Promise<{ id: stri
     if (!diary) return
 
     setIsRequestingComments(true)
+    setError(null)
+
     try {
-      // AIコメントを生成
-      const comments = await generateAIComments(diary.content)
-      
-      // AIコメントをデータベースに保存
-      const { error: insertError } = await supabase
-        .from('ai_comments')
-        .insert(
-          comments.map(comment => ({
-            diary_id: diary.id,
-            ai_name: comment.name,
-            ai_avatar: comment.avatar,
-            ai_role: comment.role,
-            comment: comment.comment
-          }))
-        )
+      const response = await fetch('/api/ai', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ content: diary.content })
+      })
 
-      if (insertError) throw insertError
+      if (!response.ok) {
+        throw new Error(`API request failed: ${response.status}`)
+      }
 
-      // AIレビューステータスを更新
-      const { error: updateError } = await supabase
-        .from('diaries')
-        .update({ ai_review_status: 'completed' })
-        .eq('id', diary.id)
+      if (!response.body) {
+        throw new Error('Response body is null')
+      }
 
-      if (updateError) throw updateError
+      const reader = response.body.getReader()
+      const decoder = new TextDecoder()
 
-      // 状態を更新
-      setAiComments(comments)
-      setDiary(prev => prev ? { ...prev, ai_review_status: 'completed' } : null)
+      // 新しいコメントを一時的に保存する配列
+      let newComments: AIComment[] = []
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        const chunk = decoder.decode(value)
+        const lines = chunk.split('\n')
+
+        for (const line of lines) {
+          if (line.trim() === '') continue
+
+          try {
+            const comment = JSON.parse(line)
+            // 重複チェック
+            if (!newComments.some(c => c.id === comment.id)) {
+              newComments.push(comment)
+              
+              // UIを即時更新
+              setAiComments(prev => {
+                if (prev.some(c => c.id === comment.id)) return prev
+                return [...prev, comment]
+              })
+            }
+          } catch (e) {
+            console.error('Error parsing comment:', e)
+          }
+        }
+      }
+
+      // すべてのコメントを受信した後、一括でデータベースに保存
+      if (newComments.length > 0) {
+        const { error: insertError } = await supabase
+          .from('ai_comments')
+          .insert(
+            newComments.map(comment => ({
+              diary_id: diary.id,
+              ai_name: comment.name,
+              ai_avatar: comment.avatar,
+              ai_role: comment.role,
+              comment: comment.comment
+            }))
+          )
+
+        if (insertError) {
+          console.error('Error saving comments to database:', insertError)
+          throw new Error('コメントの保存に失敗しました')
+        }
+
+        // AIレビューステータスを更新
+        const { error: updateError } = await supabase
+          .from('diaries')
+          .update({ ai_review_status: 'completed' })
+          .eq('id', diary.id)
+
+        if (updateError) {
+          console.error('Error updating diary status:', updateError)
+        } else {
+          setDiary(prev => prev ? { ...prev, ai_review_status: 'completed' } : null)
+        }
+      }
+
     } catch (error) {
       console.error('Error generating AI comments:', error)
       setError(error instanceof Error ? error.message : "AIコメントの生成に失敗しました")
@@ -143,26 +197,33 @@ export default function DiaryDetailPage({ params }: { params: Promise<{ id: stri
         <CardContent>
           <p className="whitespace-pre-wrap">{diary.content}</p>
         </CardContent>
-        <CardFooter className="flex justify-between items-center">
-          <div className="text-sm text-muted-foreground">
-            AIレビューステータス: {diary.ai_review_status}
+        <CardFooter className="flex flex-col space-y-2">
+          <div className="w-full flex justify-between items-center">
+            <div className="text-sm">
+              <p className="text-muted-foreground">
+                AIレビューステータス: <span className="font-mono">{diary.ai_review_status}</span>
+              </p>
+              <p className="text-xs text-muted-foreground/70">
+                コメント数: {aiComments.length}
+              </p>
+            </div>
+            {(diary.ai_review_status === 'pending' || diary.ai_review_status === null) && (
+              <Button 
+                onClick={handleRequestComments}
+                disabled={isRequestingComments}
+              >
+                {isRequestingComments ? "AIが考え中..." : "AIにコメントしてもらう"}
+              </Button>
+            )}
           </div>
-          {diary.ai_review_status === 'pending' && (
-            <Button 
-              onClick={handleRequestComments}
-              disabled={isRequestingComments}
-            >
-              {isRequestingComments ? "AIが考え中..." : "AIにコメントしてもらう"}
-            </Button>
-          )}
         </CardFooter>
       </Card>
 
       {aiComments.length > 0 && (
         <div className="space-y-4">
           <h2 className="text-xl font-bold mb-4">AIからのコメント</h2>
-          {aiComments.map((comment) => (
-            <Card key={comment.id} className="bg-muted/50">
+          {aiComments.map((comment, index) => (
+            <Card key={`${comment.id}-${index}`} className="bg-muted/50">
               <CardHeader className="flex flex-row items-center space-x-4 pb-2">
                 <div className="text-3xl">{comment.avatar}</div>
                 <div>
