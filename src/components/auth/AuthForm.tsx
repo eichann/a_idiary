@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { useToast } from "@/hooks/use-toast"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { supabase } from "@/lib/supabase/client"
 
@@ -17,6 +18,7 @@ export function AuthForm({ mode }: AuthFormProps) {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
+  const { toast } = useToast()
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -35,13 +37,22 @@ export function AuthForm({ mode }: AuthFormProps) {
           password,
         })
         if (signUpError) throw signUpError
-        router.push("/")
+        toast({ 
+          title: "メール認証が必要です",
+          duration: 10000, // 10秒間表示
+        })
+        router.push("/login")
       } else {
         const { error: signInError } = await supabase.auth.signInWithPassword({
           email,
           password,
         })
         if (signInError) throw signInError
+        // ログイン成功時にトーストを表示
+        toast({ 
+          title: "ログインしました",
+          duration: 10000, // 3秒間表示
+        })
         router.push("/")
       }
     } catch (error) {
