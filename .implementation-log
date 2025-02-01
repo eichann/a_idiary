@@ -1,0 +1,49 @@
+# 実装ログ
+
+## 2024-03-25: AIコメント機能の実装
+
+### 1. AIコメントのデータベース設計
+- ファイル: `supabase/migrations/20240325000001_create_ai_comments.sql`
+- 内容:
+  - ai_commentsテーブルの作成
+  - RLSポリシーの設定
+  - 日記テーブルとの関連付け
+
+### 2. AIコメント生成機能の実装
+- ファイル: `src/types/ai.ts`
+  - AIPersonality, AIComment型の定義
+- ファイル: `src/lib/ai.ts`
+  - AI_PERSONALITIESの定義
+  - generateAIComments関数の実装
+
+### 3. APIエンドポイントの作成
+- ファイル: `src/app/api/ai/route.ts`
+  - DeepSeek APIとの通信処理
+  - エラーハンドリング
+
+### 4. 日記詳細ページの更新
+- ファイル: `src/app/diary/[id]/page.tsx`
+  - AIコメント表示UIの実装
+  - コメント生成ボタンの追加
+  - データベースとの連携処理
+
+### 5. 環境変数の設定
+- ファイル: `.env.local`
+  - DEEPSEEK_API_KEY
+  - DEEPSEEK_API_BASE_URL
+
+## 2024-03-25: パラメータ処理の修正
+
+### 1. Next.js 14対応のパラメータ処理
+- ファイル: `src/app/diary/[id]/page.tsx`
+  - React.use()を使用したパラメータのunwrap処理の追加
+  - 非同期パラメータへの対応
+  - 警告メッセージの解消
+
+## 実装上の注意点
+- AIコメントはページ遷移後も保持されるようにデータベースに保存
+- ai_review_statusは'pending'がデフォルト値（マイグレーションとアプリケーションの両方で設定）
+- AIコメント生成はサーバーサイドで実行（APIキーの保護）
+- Next.js 14での新しいパラメータ処理方法への対応
+- React.useの使用にはuseClientディレクティブが必要
+- パラメータアクセスの一貫性を保持
