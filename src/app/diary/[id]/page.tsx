@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardFooter } from "@/components/ui/card"
 import { supabase } from "@/lib/supabase/client"
 import { Diary, moodEmojis } from "@/types/diary"
 import { AIComment } from "@/types/ai"
-import { use } from "react"
+
 
 // Markdownテキストを改行を保持してHTMLに変換する関数
 function formatComment(text: string): string {
@@ -36,9 +36,8 @@ function formatComment(text: string): string {
     .join('\n')
 }
 
-export default function DiaryDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default function DiaryDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter()
-  const unwrappedParams = use(params)
   const [diary, setDiary] = useState<Diary | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -56,7 +55,7 @@ export default function DiaryDetailPage({ params }: { params: Promise<{ id: stri
         const { data: diaryData, error: diaryError } = await supabase
           .from('diaries')
           .select('*')
-          .eq('id', unwrappedParams.id)
+          .eq('id', params.id)
           .single()
 
         if (diaryError) throw diaryError
@@ -68,7 +67,7 @@ export default function DiaryDetailPage({ params }: { params: Promise<{ id: stri
         const { data: commentsData, error: commentsError } = await supabase
           .from('ai_comments')
           .select('*')
-          .eq('diary_id', unwrappedParams.id)
+          .eq('diary_id', params.id)
           .order('created_at', { ascending: true })
 
         if (commentsError) throw commentsError
@@ -90,7 +89,7 @@ export default function DiaryDetailPage({ params }: { params: Promise<{ id: stri
     }
 
     fetchDiaryAndComments()
-  }, [unwrappedParams.id])
+  }, [params.id])
 
   const handleRequestComments = async () => {
     if (!diary) return
